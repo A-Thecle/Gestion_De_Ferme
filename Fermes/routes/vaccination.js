@@ -15,7 +15,8 @@ router.get("/liste", (req, res) => {
           message: "Erreur base de données"
         });
       }
-      if(results.lenght === 0){
+      if(results.length === 0){
+
         console.log("il y a aucune donnée dans la table reproduction")
         res.status(200).json({
             status : true, 
@@ -130,7 +131,8 @@ router.get("/:idVaccin", (req, res) => {
             });
         }
 
-        if (results.length === 0) {
+        if(results.length === 0){
+
             return res.status(404).json({
                 status: false,
                 message: "Aucun vaccination trouvé"

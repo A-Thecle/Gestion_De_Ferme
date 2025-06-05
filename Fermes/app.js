@@ -1,52 +1,93 @@
-const express = require("express")
-const mysql = require("mysql")
-const cors = require("cors")
-const bodyParser = require('body-parser') 
+const express = require("express");
+const mysql = require("mysql");
+const cors = require("cors");
+const bodyParser = require('body-parser');
 
-const app = express()
-app.use(cors())
-app.use(express.json())
+const app = express();
 
-app.use(bodyParser.json()); 
+// Middlewares
+app.use(cors({ origin: 'http://localhost:4200' }));
+app.use(express.json());
+app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-
-//Partage la connexion dans chaque route sans avoir l'importer dans chaque fichier 
-app.use((req, res, next) => {
-    req.DB = DB;
-    next();
-});
-const ReproductionRoutes = require("./routes/reproduction")
-app.use("/vaccination", ReproductionRoutes)
-const vente = require("./routes/vente")
-app.use("/vente", vente)
-const produit = require("./routes/produit")
-app.use("/produit", produit)
-const Client = require("./routes/client")
-app.use("/client", Client)
-
-
-
-
-//Connexion à la base de données 
+// 1. D'abord créer la connexion DB
 const DB = mysql.createConnection({
     host: 'localhost',
     user: 'root',
     password: '',
     database: 'fermes',
-    port: 3306 
-})
-DB.connect(function (error){
-       if(error){
-          console.log("Erreur de la connexion à la base de données")
-          console.log (error)
-       }else {
-        console.log("Connexion réussie avec la base de données Fermes")
-      
+    port: 3306,
+    timezone: 'Z'
+});
 
-       }
-}
-);
+// 2. Ensuite connecter et configurer le middleware
+DB.connect(function (error) {
+    if (error) {
+        console.log("Erreur de la connexion à la base de données");
+        console.log(error);
+    } else {
+        console.log("Connexion réussie avec la base de données Fermes");
+        
+        // Maintenant que DB est défini, on peut l'ajouter aux requêtes
+        app.use((req, res, next) => {
+            req.DB = DB;
+            next();
+        });
+
+        // 3. Importer les routes APRÈS que DB est disponible
+        const vaccinationRoutes = require("./routes/vaccination");
+        const productionRoutes = require("./routes/production");
+        const venteRoutes = require("./routes/vente");
+        const stock_aliments = require("./routes/stock_aliments");
+        const ration = require("./routes/ration");
+        const aliment = require("./routes/aliment");
+     
+
+        app.use("/vaccination", vaccinationRoutes);
+        app.use("/production", productionRoutes);
+        app.use("/vente", venteRoutes);
+        app.use("/stockAliments", stock_aliments);
+        app.use("/ration", ration);
+        app.use("/aliment", aliment);
+    
+
+        // Démarrer le serveur seulement une fois tout configuré
+        app.listen(5555, () => {
+            console.log("Démarrage du serveur");
+        });
+    }
+});
+
+// ... le reste de vos routes ...
+
+
+
+//Routes pour les stats 
+app.get("/animal/stats", (req, res) => {
+    console.log("Route /animal/stats appelée");
+    const sql = `
+        SELECT type, COUNT(*) AS total
+        FROM animaux
+        GROUP BY type
+    `;
+
+    DB.query(sql, (error, results) => {
+        if (error) {
+            console.error("Erreur SQL:", error);
+            return res.status(500).json({
+                status: false,
+                message: "Erreur de la base de données",
+                error: error.message
+            });
+        }
+
+        res.status(200).json({
+            status: true,
+            data: results
+        });
+    });
+});
 
 //Afficher tous les animaux
 app.get("/animaux", (req, res) => {
@@ -60,7 +101,8 @@ app.get("/animaux", (req, res) => {
           message: "Erreur base de données"
         });
       }
-      if(results.lenght === 0){
+      if(results.length === 0){
+        
         console.log("il y a aucune donnée dans la table animaux")
         res.status(200).json({
             status : true, 
@@ -100,7 +142,8 @@ app.get("/animal/recherche", (req, res) => {
                 error: error.message
             });
         }
-        if (results.length === 0) {
+        if(results.length === 0){
+         
             return res.status(404).json({
                 status: false,
                 message: "Aucun reproduction trouvé avec les critères spécifiés."
@@ -173,7 +216,8 @@ app.get("/animal/:animalId", (req, res) => {
             });
         }
 
-        if (results.length === 0) {
+        if(results.length === 0){
+            
             return res.status(404).json({
                 status: false,
                 message: "Aucun animal trouvé"
@@ -289,6 +333,5 @@ app.put("/animal/update/:animalId", (req, res) => {
 
 
 
-app.listen(5555, ()=> {
-    console.log("Démarrage du serveur")
-})
+
+
